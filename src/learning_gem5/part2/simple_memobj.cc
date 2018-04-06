@@ -34,9 +34,10 @@
 
 SimpleMemobj::SimpleMemobj(SimpleMemobjParams *params) :
     MemObject(params),
-    instPort(params->name + ".inst_port", this),
     dataPort(params->name + ".data_port", this),
     memPort(params->name + ".mem_side", this),
+    bypassSlb(params->bypass_slb),
+    dataPortNeedsRetry(false),
     blocked(false)
 {
 }
@@ -61,9 +62,7 @@ SimpleMemobj::getSlavePort(const std::string& if_name, PortID idx)
     panic_if(idx != InvalidPortID, "This object doesn't support vector ports");
 
     // This is the name from the Python SimObject declaration in SimpleCache.py
-    if (if_name == "inst_port") {
-        return instPort;
-    } else if (if_name == "data_port") {
+    if (if_name == "data_port") {
         return dataPort;
     } else {
         // pass it along to our super class
@@ -71,34 +70,11 @@ SimpleMemobj::getSlavePort(const std::string& if_name, PortID idx)
     }
 }
 
-void
-SimpleMemobj::CPUSidePort::sendPacket(PacketPtr pkt)
-{
-    // Note: This flow control is very simple since the memobj is blocking.
-
-    panic_if(blockedPacket != nullptr, "Should never try to send if blocked!");
-
-    // If we can't send the packet across the port, store it for later.
-    if (!sendTimingResp(pkt)) {
-        blockedPacket = pkt;
-    }
-}
 
 AddrRangeList
 SimpleMemobj::CPUSidePort::getAddrRanges() const
 {
     return owner->getAddrRanges();
-}
-
-void
-SimpleMemobj::CPUSidePort::trySendRetry()
-{
-    if (needRetry && blockedPacket == nullptr) {
-        // Only send a retry if the port is now completely free
-        needRetry = false;
-        DPRINTF(SimpleMemobj, "Sending retry req for %d\n", id);
-        sendRetryReq();
-    }
 }
 
 void
@@ -112,39 +88,13 @@ bool
 SimpleMemobj::CPUSidePort::recvTimingReq(PacketPtr pkt)
 {
     // Just forward to the memobj.
-    if (!owner->handleRequest(pkt)) {
-        needRetry = true;
-        return false;
-    } else {
-        return true;
-    }
+    return owner->handleRequest(pkt);
 }
 
 void
 SimpleMemobj::CPUSidePort::recvRespRetry()
 {
-    // We should have a blocked packet if this function is called.
-    assert(blockedPacket != nullptr);
-
-    // Grab the blocked packet.
-    PacketPtr pkt = blockedPacket;
-    blockedPacket = nullptr;
-
-    // Try to resend it. It's possible that it fails again.
-    sendPacket(pkt);
-}
-
-void
-SimpleMemobj::MemSidePort::sendPacket(PacketPtr pkt)
-{
-    // Note: This flow control is very simple since the memobj is blocking.
-
-    panic_if(blockedPacket != nullptr, "Should never try to send if blocked!");
-
-    // If we can't send the packet across the port, store it for later.
-    if (!sendTimingReq(pkt)) {
-        blockedPacket = pkt;
-    }
+    owner->memPort.sendRetryResp();
 }
 
 bool
@@ -155,17 +105,37 @@ SimpleMemobj::MemSidePort::recvTimingResp(PacketPtr pkt)
 }
 
 void
+SimpleMemobj::sendFromRetryQueue()
+{
+    assert(!retryQueue.empty());
+    if (blocked) return;
+    DPRINTF(SimpleMemobj, "Retrying %s\n",
+            retryQueue.front()->print());
+    bool res = memPort.sendTimingReq(retryQueue.front());
+    if (res) {
+        retryQueue.pop_front();
+        if (!retryQueue.empty()) {
+            schedule(new EventFunctionWrapper(
+                        [this] { sendFromRetryQueue(); }, name()+".sendretry",
+                        true),
+                     nextCycle());
+        }
+    } else {
+        blocked = true;
+    }
+}
+
+void
 SimpleMemobj::MemSidePort::recvReqRetry()
 {
-    // We should have a blocked packet if this function is called.
-    assert(blockedPacket != nullptr);
-
-    // Grab the blocked packet.
-    PacketPtr pkt = blockedPacket;
-    blockedPacket = nullptr;
-
-    // Try to resend it. It's possible that it fails again.
-    sendPacket(pkt);
+    owner->blocked = false;
+    if (owner->dataPortNeedsRetry) {
+        owner->dataPort.sendRetryReq();
+        owner->dataPortNeedsRetry = false;
+    }
+    if (!owner->retryQueue.empty()) {
+        owner->sendFromRetryQueue();
+    }
 }
 
 void
@@ -177,47 +147,35 @@ SimpleMemobj::MemSidePort::recvRangeChange()
 bool
 SimpleMemobj::handleRequest(PacketPtr pkt)
 {
-    if (blocked) {
-        // There is currently an outstanding request. Stall.
-        return false;
-    }
-
     DPRINTF(SimpleMemobj, "Got request for addr %#x\n", pkt->getAddr());
 
-    // This memobj is now blocked waiting for the response to this packet.
-    blocked = true;
-
-    // Simply forward to the memory port
-    memPort.sendPacket(pkt);
-
-    return true;
+    // Assuming all load misses cause a read shared
+    if (bypassSlb || pkt->cmd != MemCmd::ReadSharedReq ||
+            pkt->req->isPrefetch()) {
+        assert(!blocked);
+        // Simply forward to the memory port
+        bool res = memPort.sendTimingReq(pkt);
+        if (!res) {
+            dataPortNeedsRetry = true;
+            blocked = true;
+        }
+        return res;
+    } else {
+        DPRINTF(SimpleMemobj, "Delaying as addr %x from PC %x (%s)\n",
+                pkt->req->getPaddr(), pkt->req->getPC(), pkt->print());
+        auto it = slb.find(pkt->req->getPaddr());
+        assert(it == slb.end());
+        slb[pkt->req->getPaddr()] = std::make_pair(pkt, curTick());
+        return true;
+    }
 }
 
 bool
 SimpleMemobj::handleResponse(PacketPtr pkt)
 {
-    assert(blocked);
     DPRINTF(SimpleMemobj, "Got response for addr %#x\n", pkt->getAddr());
 
-    // The packet is now done. We're about to put it in the port, no need for
-    // this object to continue to stall.
-    // We need to free the resource before sending the packet in case the CPU
-    // tries to send another request immediately (e.g., in the same callchain).
-    blocked = false;
-
-    // Simply forward to the memory port
-    if (pkt->req->isInstFetch()) {
-        instPort.sendPacket(pkt);
-    } else {
-        dataPort.sendPacket(pkt);
-    }
-
-    // For each of the cpu ports, if it needs to send a retry, it should do it
-    // now since this memory object may be unblocked now.
-    instPort.trySendRetry();
-    dataPort.trySendRetry();
-
-    return true;
+    return dataPort.sendTimingResp(pkt);
 }
 
 void
@@ -238,10 +196,71 @@ SimpleMemobj::getAddrRanges() const
 void
 SimpleMemobj::sendRangeChange()
 {
-    instPort.sendRangeChange();
     dataPort.sendRangeChange();
 }
 
+void
+SimpleMemobj::squash(Addr addr)
+{
+    if (bypassSlb) return;
+    DPRINTF(SimpleMemobj, "Got squash for addr %x\n", addr);
+    auto it = slb.find(addr);
+    if (it != slb.end()) {
+        DPRINTF(SimpleMemobj, "Forwarding %s\n", it->second.first->print());
+        if (!retryQueue.empty()) {
+            retryQueue.push_back(it->second.first);
+        } else {
+            bool res = memPort.sendTimingReq(it->second.first);
+            if (!res) {
+                DPRINTF(SimpleMemobj, "Putting %s on the retry queue\n",
+                        it->second.first->print());
+                retryQueue.push_back(it->second.first);
+                blocked = true;
+            }
+        }
+        slb.erase(it);
+        squashes++;
+        queuedTime.sample(curTick() - it->second.second);
+    }
+}
+
+void
+SimpleMemobj::commit(Addr addr)
+{
+    if (bypassSlb) return;
+    DPRINTF(SimpleMemobj, "Got commit for addr %x\n", addr);
+    auto it = slb.find(addr);
+    if (it != slb.end()) {
+        DPRINTF(SimpleMemobj, "Forwarding %s\n", it->second.first->print());
+        if (!retryQueue.empty()) {
+            retryQueue.push_back(it->second.first);
+        } else {
+            bool res = memPort.sendTimingReq(it->second.first);
+            if (!res) {
+                DPRINTF(SimpleMemobj, "Putting %s on the retry queue\n",
+                        it->second.first->print());
+                retryQueue.push_back(it->second.first);
+            }
+        }
+        slb.erase(it);
+        queuedTime.sample(curTick() - it->second.second);
+    }
+}
+
+void
+SimpleMemobj::regStats()
+{
+    MemObject::regStats();
+
+    squashes.name(name() + ".squashes")
+        .desc("Number of squashes")
+        ;
+
+    queuedTime.name(name() + ".queuedTime")
+        .desc("Ticks for misses to the cache")
+        .init(16) // number of buckets
+        ;
+}
 
 
 SimpleMemobj*

@@ -62,9 +62,13 @@ class DerivO3CPU(BaseCPU):
     def support_take_over(cls):
         return True
 
+    slb = Param.SimpleMemobj("Bridge containing the SLB")
+
     allNonSpeculative = Param.Bool(False, "Force no speculation")
 
     loadNonSpeculative = Param.Bool(False, "Force no speculation on loads")
+
+    loadNonSpeculativeImpl2 = Param.Bool(False, "no speculation on loads")
 
     activity = Param.Unsigned(0, "Initial count")
 

@@ -87,7 +87,8 @@ system.mem_mode = 'timing'               # Use timing accesses
 system.mem_ranges = [AddrRange('512MB')] # Create an address range
 
 # Create a simple CPU
-system.cpu = TimingSimpleCPU()
+system.cpu = DerivO3CPU()
+system.cpu.slb = SimpleMemobj(bypass_slb = False)
 
 # Create an L1 instruction and data cache
 system.cpu.icache = L1ICache(opts)
@@ -102,7 +103,9 @@ system.l2bus = L2XBar()
 
 # Hook the CPU ports up to the l2bus
 system.cpu.icache.connectBus(system.l2bus)
-system.cpu.dcache.connectBus(system.l2bus)
+#system.cpu.dcache.connectBus(system.l2bus)
+system.cpu.slb.mem_side = system.l2bus.slave
+system.cpu.slb.data_port = system.cpu.dcache.mem_side
 
 # Create an L2 cache and connect it to the l2bus
 system.l2cache = L2Cache(opts)

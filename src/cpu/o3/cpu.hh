@@ -78,6 +78,7 @@ class O3ThreadContext;
 class Checkpoint;
 class MemObject;
 class Process;
+class SimpleMemobj;
 
 struct BaseCPUParams;
 
@@ -799,6 +800,9 @@ class FullO3CPU : public BaseO3CPU
     //number of misc
     Stats::Scalar miscRegfileReads;
     Stats::Scalar miscRegfileWrites;
+
+    SimpleMemobj *slb;
+    bool loadNonSpeculativeImpl2;
 };
 
 #endif // __CPU_O3_CPU_HH__

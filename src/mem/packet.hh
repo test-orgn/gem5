@@ -348,6 +348,7 @@ class Packet : public Printable
     std::vector<bool> bytesValid;
 
   public:
+    bool noInsert;
 
     /**
      * The extra delay from seeing the packet until the header is
@@ -898,6 +899,7 @@ class Packet : public Printable
         assert(needsResponse());
         assert(isRequest());
         cmd = cmd.responseCommand();
+        noInsert = false;
 
         // responses are never express, even if the snoop that
         // triggered them was

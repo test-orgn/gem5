@@ -52,10 +52,15 @@ import SimpleOpts
 
 from system import MySystem
 
-jump_time = '30s'
-warmup_insts = int(200e6) #6-8 minutes
-detailed_warmup_insts = int(10e6) #~1 minute.
-simulation_insts = int(100e6)
+# jump_time = '30s'
+# warmup_insts = int(200e6) #6-8 minutes
+# detailed_warmup_insts = int(10e6) #~1 minute.
+# simulation_insts = int(100e6)
+jump_time = '10s'
+warmup_insts = int(200e5) #6-8 minutes
+detailed_warmup_insts = int(10e5) #~1 minute.
+simulation_insts = int(100e4)
+
 
 def finish(retval=7):
     print
@@ -178,7 +183,36 @@ def runTestNoSpecLoad(system):
         global pids
         pids.append(pid)
 
-def runTestNoSpecLoad(system):
+def runTestSLB(system):
+    #pid = m5.fork('%(parent)s/slb')
+    pid = 0
+    if pid == 0: # in child
+        system.switchCpus(system.atomicCpu, system.timingCpuSLB)
+
+        system.timingCpuSLB[0].scheduleInstStop(0, detailed_warmup_insts,
+                                                 "Max Insts")
+        print "Detailed warmup simulation"
+        exit_event = m5.simulate()
+        if exit_event.getCause() != "Max Insts":
+            print "Exited because", exit_event.getCause()
+            print "giving up"
+            finish(8)
+
+        m5.stats.reset()
+        system.timingCpuSLB[0].scheduleInstStop(0, simulation_insts,
+                                                 "Max Insts")
+        print "Running real simulation for no spec loads"
+        exit_event = m5.simulate()
+        if exit_event.getCause() != "Max Insts":
+            print "Exited because", exit_event.getCause()
+            print "giving up"
+            finish(8)
+        sys.exit(0)
+    else:
+        global pids
+        pids.append(pid)
+
+def runTestInOrder(system):
     pid = m5.fork('%(parent)s/in_order')
     if pid == 0: # in child
         system.switchCpus(system.atomicCpu, system.timingCpuInOrder)
@@ -254,6 +288,9 @@ if __name__ == "__m5_main__":
         print "giving up"
         finish()
 
+    from m5 import trace
+    trace.disable()
+
     # Run for 30 seconds into the application
     ticks = fromSeconds(toLatency(jump_time))
     abs_ticks = m5.curTick() + ticks
@@ -277,11 +314,14 @@ if __name__ == "__m5_main__":
         print "giving up"
         finish()
 
+    trace.enable()
+
     m5.stats.dump()
-    runTestBase(system)
-    runTestNoSpec(system)
-    runTestNoSpecLoad(system)
-    runTestInOrder(system)
+    # runTestBase(system)
+    # runTestNoSpec(system)
+    # runTestNoSpecLoad(system)
+    runTestSLB(system)
+    # runTestInOrder(system)
 
     from time import sleep
     print "Waiting for children"

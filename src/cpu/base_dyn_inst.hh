@@ -1084,6 +1084,7 @@ BaseDynInst<Impl>::finishTranslation(WholeTranslationState *state)
     fault = state->getFault();
 
     instFlags[IsStrictlyOrdered] = state->isStrictlyOrdered();
+    if (cpu->loadNonSpeculativeImpl2) instFlags[IsStrictlyOrdered] = true;
 
     if (fault == NoFault) {
         // save Paddr for a single req

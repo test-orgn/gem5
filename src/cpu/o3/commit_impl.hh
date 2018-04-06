@@ -49,14 +49,14 @@
 #include <string>
 
 #include "arch/utility.hh"
-#include "base/loader/symtab.hh"
 #include "base/cp_annotate.hh"
+#include "base/loader/symtab.hh"
 #include "config/the_isa.hh"
+#include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
+#include "cpu/exetrace.hh"
 #include "cpu/o3/commit.hh"
 #include "cpu/o3/thread_state.hh"
-#include "cpu/base.hh"
-#include "cpu/exetrace.hh"
 #include "cpu/timebuf.hh"
 #include "debug/Activity.hh"
 #include "debug/Commit.hh"
@@ -64,6 +64,7 @@
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
 #include "debug/O3PipeView.hh"
+#include "learning_gem5/part2/simple_memobj.hh"
 #include "params/DerivO3CPU.hh"
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
@@ -716,6 +717,11 @@ DefaultCommit<Impl>::tick()
         } else if (!rob->isEmpty(tid)) {
             DynInstPtr inst = rob->readHeadInst(tid);
 
+            if (inst->isLoad()) {
+                cpu->slb->commit(inst->physEffAddrLow);
+                cpu->slb->commit(inst->physEffAddrHigh);
+            }
+
             ppCommitStall->notify(inst);
 
             DPRINTF(Commit,"[tid:%i]: Can't commit, Instruction [sn:%lli] PC "
@@ -1020,6 +1026,11 @@ DefaultCommit<Impl>::commitInsts()
 
             rob->retireHead(commit_thread);
 
+            if (head_inst->isLoad()) {
+                cpu->slb->squash(head_inst->physEffAddrLow);
+                cpu->slb->squash(head_inst->physEffAddrHigh);
+            }
+
             ++commitSquashedInsts;
             // Notify potential listeners that this instruction is squashed
             ppSquash->notify(head_inst);
@@ -1027,6 +1038,11 @@ DefaultCommit<Impl>::commitInsts()
             // Record that the number of ROB entries has changed.
             changedROBNumEntries[tid] = true;
         } else {
+            if (head_inst->isLoad()) {
+                cpu->slb->commit(head_inst->physEffAddrLow);
+                cpu->slb->commit(head_inst->physEffAddrHigh);
+            }
+
             pc[tid] = head_inst->pcState();
 
             // Increment the total number of non-speculative instructions
@@ -1177,6 +1193,13 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         }
 
         toIEW->commitInfo[tid].nonSpecSeqNum = head_inst->seqNum;
+
+        // Here is where we would signal to the load that it can actually go
+        // out to the memory system.
+        // We should add a cache pointer to the CPU. Then, we can call into the
+        // cache to tell it that it is safe to send the load.
+        // Or, we could send another packet/cmd?
+        // Also need to notify the cache on sqaushes.
 
         // Change the instruction so it won't try to commit again until
         // it is executed.

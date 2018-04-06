@@ -34,6 +34,7 @@ class SimpleMemobj(MemObject):
     type = 'SimpleMemobj'
     cxx_header = "learning_gem5/part2/simple_memobj.hh"
 
-    inst_port = SlavePort("CPU side port, receives requests")
     data_port = SlavePort("CPU side port, receives requests")
     mem_side = MasterPort("Memory side port, sends requests")
+
+    bypass_slb = Param.Bool(True, "skip slb")

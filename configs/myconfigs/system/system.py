@@ -95,6 +95,8 @@ class MySystem(LinuxX86System):
                         'root=/dev/hda1']
         self.boot_osflags = ' '.join(boot_options)
 
+        self.slb = SimpleMemobj()
+
         # Create the CPUs for our system.
         self.createCPU()
 
@@ -142,6 +144,8 @@ class MySystem(LinuxX86System):
                                      switched_out = True)
                    for i in range(self._opts.cpus)]
         map(lambda c: c.createThreads(), self.timingCpuBase)
+        for cpu in self.timingCpuBase:
+            cpu.slb = self.slb
 
         self.timingCpuNoSpec = [DerivO3CPU(cpu_id = i,
                                      switched_out = True)
@@ -149,6 +153,7 @@ class MySystem(LinuxX86System):
         map(lambda c: c.createThreads(), self.timingCpuNoSpec)
         for cpu in self.timingCpuNoSpec:
             cpu.allNonSpeculative = True
+            cpu.slb = self.slb
 
         self.timingCpuNoLoad = [DerivO3CPU(cpu_id = i,
                                      switched_out = True)
@@ -156,6 +161,15 @@ class MySystem(LinuxX86System):
         map(lambda c: c.createThreads(), self.timingCpuNoLoad)
         for cpu in self.timingCpuNoLoad:
             cpu.loadNonSpeculative = True
+            cpu.slb = self.slb
+
+        self.timingCpuSLB = [DerivO3CPU(cpu_id = i,
+                                     switched_out = True)
+                   for i in range(self._opts.cpus)]
+        map(lambda c: c.createThreads(), self.timingCpuSLB)
+        for cpu in self.timingCpuSLB:
+            cpu.slb = self.slb
+            self.slb.bypass_slb = False
 
         self.timingCpuInOrder = [MinorCPU(cpu_id = i,
                                      switched_out = True)
@@ -192,8 +206,11 @@ class MySystem(LinuxX86System):
 
             # Hook the CPU ports up to the l2bus
             cpu.icache.connectBus(cpu.l2bus)
-            cpu.dcache.connectBus(cpu.l2bus)
+            # cpu.dcache.connectBus(cpu.l2bus)
             cpu.mmucache.connectBus(cpu.l2bus)
+
+            cpu.dcache.mem_side = self.slb.data_port
+            cpu.l2bus.slave = self.slb.mem_side
 
             # Create an L2 cache and connect it to the l2bus
             cpu.l2cache = L2Cache(self._opts)

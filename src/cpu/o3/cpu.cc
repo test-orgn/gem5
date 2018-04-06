@@ -185,7 +185,9 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
       globalSeqNum(1),
       system(params->system),
-      lastRunningCycle(curCycle())
+      lastRunningCycle(curCycle()),
+      slb(params->slb),
+      loadNonSpeculativeImpl2(params->loadNonSpeculativeImpl2)
 {
     if (!params->switched_out) {
         _status = Running;

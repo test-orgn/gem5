@@ -55,28 +55,13 @@ class SimpleMemobj : public MemObject
         /// The object that owns this object (SimpleMemobj)
         SimpleMemobj *owner;
 
-        /// True if the port needs to send a retry req.
-        bool needRetry;
-
-        /// If we tried to send a packet and it was blocked, store it here
-        PacketPtr blockedPacket;
-
       public:
         /**
          * Constructor. Just calls the superclass constructor.
          */
         CPUSidePort(const std::string& name, SimpleMemobj *owner) :
-            SlavePort(name, owner), owner(owner), needRetry(false),
-            blockedPacket(nullptr)
+            SlavePort(name, owner), owner(owner)
         { }
-
-        /**
-         * Send a packet across this port. This is called by the owner and
-         * all of the flow control is hanled in this function.
-         *
-         * @param packet to send.
-         */
-        void sendPacket(PacketPtr pkt);
 
         /**
          * Get a list of the non-overlapping address ranges the owner is
@@ -87,19 +72,13 @@ class SimpleMemobj : public MemObject
          */
         AddrRangeList getAddrRanges() const override;
 
-        /**
-         * Send a retry to the peer port only if it is needed. This is called
-         * from the SimpleMemobj whenever it is unblocked.
-         */
-        void trySendRetry();
-
       protected:
         /**
          * Receive an atomic request packet from the master port.
          * No need to implement in this simple memobj.
          */
         Tick recvAtomic(PacketPtr pkt) override
-        { panic("recvAtomic unimpl."); }
+        { return owner->memPort.sendAtomic(pkt); }
 
         /**
          * Receive a functional request packet from the master port.
@@ -125,6 +104,11 @@ class SimpleMemobj : public MemObject
          * port) and was unsuccesful.
          */
         void recvRespRetry() override;
+
+        bool recvTimingSnoopResp(PacketPtr pkt) override
+        {
+            return owner->memPort.sendTimingSnoopResp(pkt);
+        }
     };
 
     /**
@@ -137,24 +121,15 @@ class SimpleMemobj : public MemObject
         /// The object that owns this object (SimpleMemobj)
         SimpleMemobj *owner;
 
-        /// If we tried to send a packet and it was blocked, store it here
-        PacketPtr blockedPacket;
-
       public:
         /**
          * Constructor. Just calls the superclass constructor.
          */
         MemSidePort(const std::string& name, SimpleMemobj *owner) :
-            MasterPort(name, owner), owner(owner), blockedPacket(nullptr)
+            MasterPort(name, owner), owner(owner)
         { }
 
-        /**
-         * Send a packet across this port. This is called by the owner and
-         * all of the flow control is hanled in this function.
-         *
-         * @param packet to send.
-         */
-        void sendPacket(PacketPtr pkt);
+        bool isSnooping() const override { return true; }
 
       protected:
         /**
@@ -177,6 +152,26 @@ class SimpleMemobj : public MemObject
          * interconnect component like a bus.
          */
         void recvRangeChange() override;
+
+        Tick recvAtomicSnoop(PacketPtr pkt) override
+        {
+            return owner->dataPort.sendAtomicSnoop(pkt);
+        }
+
+        void recvFunctionalSnoop(PacketPtr pkt) override
+        {
+            owner->dataPort.sendFunctionalSnoop(pkt);
+        }
+
+        void recvTimingSnoopReq(PacketPtr pkt) override
+        {
+            owner->dataPort.sendTimingSnoopReq(pkt);
+        }
+
+        void recvRetrySnoopResp() override
+        {
+            owner->dataPort.sendRetrySnoopResp();
+        }
     };
 
     /**
@@ -219,14 +214,15 @@ class SimpleMemobj : public MemObject
     void sendRangeChange();
 
     /// Instantiation of the CPU-side ports
-    CPUSidePort instPort;
     CPUSidePort dataPort;
 
     /// Instantiation of the memory-side port
     MemSidePort memPort;
 
-    /// True if this is currently blocked waiting for a response.
-    bool blocked;
+    std::map<Addr, std::pair<PacketPtr, Tick>> slb;
+    std::deque<PacketPtr> retryQueue;
+    bool bypassSlb;
+    bool dataPortNeedsRetry;
 
   public:
 
@@ -259,6 +255,16 @@ class SimpleMemobj : public MemObject
      */
     BaseSlavePort& getSlavePort(const std::string& if_name,
                                 PortID idx = InvalidPortID) override;
+
+    void squash(Addr addr);
+    void commit(Addr addr);
+    void sendFromRetryQueue();
+    bool blocked;
+
+    Stats::Histogram queuedTime;
+    Stats::Scalar squashes;
+
+    void regStats() override;
 };
 
 
