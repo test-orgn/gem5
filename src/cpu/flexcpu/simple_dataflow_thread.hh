@@ -459,6 +459,10 @@ class SDCPUThread : public ThreadContext
     Stats::Scalar numInstsStat;
     Stats::Scalar numOpsStat;
 
+    Stats::Histogram numSquashed;
+
+    Stats::Vector instTypes;
+
     // END Statistics
 
   public:
