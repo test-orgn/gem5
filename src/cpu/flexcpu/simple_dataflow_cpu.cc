@@ -168,6 +168,9 @@ SimpleDataflowCPU::markActiveCycle()
     if (curTick() != lastActiveTick) {
         numCycles++;
         lastActiveTick = curTick();
+        for (auto& thread : threads) {
+            thread->recordCycleStats();
+        }
     }
 }
 

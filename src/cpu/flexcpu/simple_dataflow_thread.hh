@@ -455,6 +455,9 @@ class SDCPUThread : public ThreadContext
     /// Total number of micro-ops committed. This is inclusive of instructions
     Counter numOps = 0;
 
+    int fetchedThisCycle = 0;
+    int squashedThisCycle = 0;
+
     /// Statistics for tracking the above
     Stats::Scalar numInstsStat;
     Stats::Scalar numOpsStat;
@@ -462,6 +465,10 @@ class SDCPUThread : public ThreadContext
     Stats::Histogram numSquashed;
 
     Stats::Vector instTypes;
+
+    Stats::Histogram fetchedInstsPerCycle;
+    Stats::Histogram squashedPerCycle;
+    Stats::Histogram activeInstructions;
 
     // END Statistics
 
@@ -503,6 +510,11 @@ class SDCPUThread : public ThreadContext
      * @return the number macro-ops and instructions this thread has committed
      */
     Counter getNumOps() { return numOps; }
+
+    /**
+     * Called from the CPU after every active cycle to record stats
+     */
+    void recordCycleStats();
 
     // END Statistics
 
