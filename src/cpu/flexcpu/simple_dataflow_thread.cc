@@ -253,7 +253,10 @@ SDCPUThread::attemptFetch(weak_ptr<InflightInst> inst)
     };
 
     _cpuPtr->requestInstAddrTranslation(fetch_req, getThreadContext(),
-                                        callback);
+        callback, [inst]{
+            shared_ptr<InflightInst> inst_ptr = inst.lock();
+            return !inst_ptr || inst_ptr->isSquashed();
+        });
 }
 
 void
@@ -684,10 +687,11 @@ SDCPUThread::onPCTranslated(weak_ptr<InflightInst> inst, Fault fault,
 
     // No changes to the request before asking the CPU to handle it if there is
     // not a fault. Let the CPU generate the packet.
-    if (!_cpuPtr->requestInstructionData(req, callback)) {
-        panic("The CPU rejected my fetch request and I haven't been programmed"
-              " to know how to continue!!!");
-    }
+    _cpuPtr->requestInstructionData(req, callback,
+        [inst]{
+            shared_ptr<InflightInst> inst_ptr = inst.lock();
+            return !inst_ptr || inst_ptr->isSquashed();
+        });
 }
 
 void
@@ -1179,10 +1183,10 @@ SDCPUThread::MemIface::initiateMemRead(shared_ptr<InflightInst> inst_ptr,
         };
 
         sdCPUThread._cpuPtr->requestDataAddrTranslation(req1, tc, false,
-                                                        callback1);
+                                                        inst_ptr, callback1);
 
         sdCPUThread._cpuPtr->requestDataAddrTranslation(req2, tc, false,
-                                                        callback2);
+                                                        inst_ptr, callback2);
 
         return NoFault;
     }
@@ -1193,7 +1197,8 @@ SDCPUThread::MemIface::initiateMemRead(shared_ptr<InflightInst> inst_ptr,
                                          nullptr);
     };
 
-    sdCPUThread._cpuPtr->requestDataAddrTranslation(req, tc, false, callback);
+    sdCPUThread._cpuPtr->requestDataAddrTranslation(req, tc, false, inst_ptr,
+                                                    callback);
 
     return NoFault;
 }
@@ -1257,10 +1262,10 @@ SDCPUThread::MemIface::writeMem(shared_ptr<InflightInst> inst_ptr,
 
 
         sdCPUThread._cpuPtr->requestDataAddrTranslation(req1, tc, true,
-                                                        callback1);
+                                                        inst_ptr, callback1);
 
         sdCPUThread._cpuPtr->requestDataAddrTranslation(req2, tc, true,
-                                                        callback2);
+                                                        inst_ptr, callback2);
 
         return NoFault;
     }
@@ -1280,7 +1285,8 @@ SDCPUThread::MemIface::writeMem(shared_ptr<InflightInst> inst_ptr,
         sdCPUThread.onDataAddrTranslated(inst, fault, req, true, copy);
     };
 
-    sdCPUThread._cpuPtr->requestDataAddrTranslation(req, tc, true, callback);
+    sdCPUThread._cpuPtr->requestDataAddrTranslation(req, tc, true, inst_ptr,
+                                                    callback);
 
     return NoFault;
 }
