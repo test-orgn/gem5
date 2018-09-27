@@ -48,7 +48,8 @@ using namespace std;
 SDCPUThread::SDCPUThread(SimpleDataflowCPU* cpu_, ThreadID tid_,
                     System* system_, BaseTLB* itb_, BaseTLB* dtb_,
                     TheISA::ISA* isa_, bool use_kernel_stats_,
-                    unsigned fetch_buf_size, bool strict_ser):
+                    unsigned fetch_buf_size, unsigned inflight_insts_size,
+                    bool strict_ser):
     memIface(*this),
     _cpuPtr(cpu_),
     _name(cpu_->name() + ".thread" + to_string(tid_)),
@@ -57,7 +58,8 @@ SDCPUThread::SDCPUThread(SimpleDataflowCPU* cpu_, ThreadID tid_,
                                      use_kernel_stats_)),
     isa(isa_),
     fetchBuf(vector<uint8_t>(fetch_buf_size)),
-    fetchBufMask(~(static_cast<Addr>(fetch_buf_size) - 1))
+    fetchBufMask(~(static_cast<Addr>(fetch_buf_size) - 1)),
+    inflightInstsMaxSize(inflight_insts_size)
 {
     panic_if(fetch_buf_size % sizeof(TheISA::MachInst) != 0,
              "Fetch buffer size should be multiple of instruction size!");
@@ -69,7 +71,7 @@ SDCPUThread::SDCPUThread(SimpleDataflowCPU* cpu_, ThreadID tid_,
 SDCPUThread::SDCPUThread(SimpleDataflowCPU* cpu_, ThreadID tid_,
                     System* system_, Process* process_, BaseTLB* itb_,
                     BaseTLB* dtb_, TheISA::ISA* isa_, unsigned fetch_buf_size,
-                    bool strict_ser):
+                    unsigned inflight_insts_size, bool strict_ser):
     memIface(*this),
     _cpuPtr(cpu_),
     _name(cpu_->name() + ".thread" + to_string(tid_)),
@@ -78,7 +80,8 @@ SDCPUThread::SDCPUThread(SimpleDataflowCPU* cpu_, ThreadID tid_,
                                      isa_)),
     isa(isa_),
     fetchBuf(vector<uint8_t>(fetch_buf_size)),
-    fetchBufMask(~(static_cast<Addr>(fetch_buf_size) - 1))
+    fetchBufMask(~(static_cast<Addr>(fetch_buf_size) - 1)),
+    inflightInstsMaxSize(inflight_insts_size)
 {
     panic_if(fetch_buf_size % sizeof(TheISA::MachInst) != 0,
              "Fetch buffer size should be multiple of instruction size!");
@@ -119,6 +122,13 @@ SDCPUThread::advanceInst(TheISA::PCState next_pc)
 {
     if (status() != ThreadContext::Active) {
         // If this thread isn't currently active, don't do anything
+        return;
+    }
+
+    advanceInstNeedsRetry = static_cast<bool>(inflightInstsMaxSize)
+                         && inflightInsts.size() >= inflightInstsMaxSize;
+    if (advanceInstNeedsRetry) {
+        advanceInstRetryPC = next_pc;
         return;
     }
 
@@ -281,6 +291,7 @@ SDCPUThread::commitAllAvailableInstructions()
 
     shared_ptr<InflightInst> inst_ptr;
 
+    bool buffer_shrunk = false;
     while (!inflightInsts.empty()
         && ((inst_ptr = inflightInsts.front())->isComplete()
             || inst_ptr->isSquashed())) {
@@ -297,6 +308,7 @@ SDCPUThread::commitAllAvailableInstructions()
         }
 
         inflightInsts.pop_front();
+        buffer_shrunk = true;
     }
 
     if (inflightInsts.empty()) {
@@ -310,6 +322,10 @@ SDCPUThread::commitAllAvailableInstructions()
                 inst_ptr->staticInst()->disassemble(
                     inst_ptr->pcState().instAddr()).c_str() :
                     "Not yet decoded.");
+    }
+
+    if (buffer_shrunk && advanceInstNeedsRetry) {
+        advanceInst(advanceInstRetryPC);
     }
 }
 
@@ -552,6 +568,8 @@ SDCPUThread::markFault(shared_ptr<InflightInst> inst_ptr, Fault fault)
     squashUpTo(inst_ptr);
 
     inst_ptr->notifySquashed();
+
+    advanceInstNeedsRetry = false;
 
     commitAllAvailableInstructions();
 }

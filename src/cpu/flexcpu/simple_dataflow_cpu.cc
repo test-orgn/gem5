@@ -65,6 +65,7 @@ SimpleDataflowCPU::SimpleDataflowCPU(SimpleDataflowCPUParams* params):
         threads.push_back(m5::make_unique<SDCPUThread>(this, i, params->system,
             params->workload[i], params->itb, params->dtb, params->isa[i],
             params->fetch_buffer_size,
+            params->instruction_buffer_size,
             params->strict_serialization));
 
         threadContexts.push_back(threads[i]->getThreadContext());
