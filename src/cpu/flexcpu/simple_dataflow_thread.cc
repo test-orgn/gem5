@@ -785,6 +785,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
             DPRINTF(SDCPUDeps, "Dep %d -> %d [serial]\n",
                     inst_ptr->seqNum(), serializing_inst->seqNum());
             inst_ptr->addCommitDependency(serializing_inst);
+            waitingForSerializing++;
         }
 
         if (inflightInsts.size() > 1 && static_inst->isSerializing()) {
@@ -797,6 +798,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
                 DPRINTF(SDCPUDeps, "Dep %d -> %d [serial]\n",
                         inst_ptr->seqNum(), last_inst->seqNum());
                 inst_ptr->addCommitDependency(last_inst);
+                serializingInst++;
             }
 
             lastSerializingInstruction = inst_ptr;
@@ -809,6 +811,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
             DPRINTF(SDCPUDeps, "Dep %d -> %d [serial]\n",
                     inst_ptr->seqNum(), last_inst->seqNum());
             inst_ptr->addCommitDependency(last_inst);
+            serializingInst++;
         }
 
         auto serializing_inst = lastSerializingInstruction.lock();
@@ -816,10 +819,12 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
             DPRINTF(SDCPUDeps, "Dep %d -> %d [serial]\n",
                     inst_ptr->seqNum(), serializing_inst->seqNum());
             inst_ptr->addCommitDependency(serializing_inst);
+            waitingForSerializing++;
         }
 
         if (static_inst->isSerializeAfter()) {
             lastSerializingInstruction = inst_ptr;
+            serializingInst++;
         }
     }
 
@@ -836,11 +841,13 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
             DPRINTF(SDCPUDeps, "Dep %d -> %d [mem ref -> barrier]\n",
                     inst_ptr->seqNum(), last_barrier->seqNum());
             inst_ptr->addMemDependency(last_barrier);
+            waitingForMemBarrier++;
         }
     }
 
     if (static_inst->isMemBarrier()) {
         lastMemBarrier = inst_ptr;
+        memBarrier++;
         for (auto itr = inflightInsts.rbegin();
              itr != inflightInsts.rend();
              ++itr) {
@@ -855,8 +862,10 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
                         inst_ptr->seqNum(), (*itr)->seqNum());
                 if (static_inst->isMemRef()) {
                     inst_ptr->addMemDependency(*itr);
+                    waitingForMemBarrier++;
                 } else {
                     inst_ptr->addDependency(*itr);
+                    waitingForMemBarrier++;
                 }
             }
         }
@@ -875,6 +884,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
 
         if (!(last_inst->isCommitted() || last_inst->isSquashed())) {
             inst_ptr->addCommitDependency(last_inst);
+            nonSpeculativeInst++;
         }
 
         // This is a very conservative implementation of the rule, but has been
@@ -1391,6 +1401,27 @@ SDCPUThread::regStats(const std::string &name)
         .init(32)
         .desc("Number of instructions active each cycle")
     ;
+
+    serializingInst
+        .name(name + ".serializingInst")
+        .desc("Number of serializing instructions added to inflight insts.")
+        ;
+    waitingForSerializing
+        .name(name + ".waitingForSerializing")
+        .desc("Number of instructions that had to wait a serializing inst")
+        ;
+    waitingForMemBarrier
+        .name(name + ".waitingForMemBarrier")
+        .desc("Number of instructions that had to wait for a memory barrier")
+        ;
+    memBarrier
+        .name(name + ".memBarrier")
+        .desc("Number of memory barriers")
+        ;
+    nonSpeculativeInst
+        .name(name + ".nonSpeculativeInst")
+        .desc("Number of non speculative instructions")
+        ;
 
     instTypes
         .name(name + ".instTypes")
