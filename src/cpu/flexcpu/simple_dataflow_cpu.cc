@@ -239,7 +239,7 @@ SimpleDataflowCPU::requestExecution(StaticInstPtr inst,
             callback_func(fault);
         }, name() + ".delayedCall", true);
 
-        schedule(e, curTick() + cyclesToTicks(Cycles(1)));
+        schedule(e, curTick() + cyclesToTicks(executionLatency));
 
         return true;
     });
