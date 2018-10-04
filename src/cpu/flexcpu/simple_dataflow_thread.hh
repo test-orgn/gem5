@@ -653,6 +653,9 @@ class SDCPUThread : public ThreadContext
 
     Stats::Vector squashedStage;
 
+    Stats::Histogram wrongInstsFetched;
+    Stats::Histogram branchMispredictLatency;
+
     /// Statistics for instruction state latency distributions
 
     // Distribution of times from entry/exit to/from buffer.
