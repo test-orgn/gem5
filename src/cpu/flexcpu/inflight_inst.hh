@@ -46,11 +46,7 @@ class InflightInst : public ExecContext,
                      public std::enable_shared_from_this<InflightInst>
 {
   public:
-    using IntReg = TheISA::IntReg;
     using PCState = TheISA::PCState;
-    using FloatReg = TheISA::FloatReg;
-    using FloatRegBits = TheISA::FloatRegBits;
-    using MiscReg = TheISA::MiscReg;
 
     using CCReg = TheISA::CCReg;
     using VecRegContainer = TheISA::VecRegContainer;
@@ -187,7 +183,7 @@ class InflightInst : public ExecContext,
      * For use in storing results of writes to miscRegs that don't go through
      * the operands of the StaticInst.
      */
-    std::vector<MiscReg> miscResultVals;
+    std::vector<RegVal> miscResultVals;
     std::vector<int> miscResultIdxs;
 
     Fault _fault = NoFault;
@@ -473,18 +469,13 @@ class InflightInst : public ExecContext,
 
     // BEGIN ExecContext interface functions
 
-    IntReg readIntRegOperand(const StaticInst* si, int op_idx) override;
+    RegVal readIntRegOperand(const StaticInst* si, int op_idx) override;
     void setIntRegOperand(const StaticInst* si, int dst_idx,
-                          IntReg val) override;
+                          RegVal val) override;
 
-    FloatReg readFloatRegOperand(const StaticInst* si, int op_idx) override;
-    FloatRegBits readFloatRegOperandBits(const StaticInst* si,
-                                            int op_idx) override;
-
-    void setFloatRegOperand(const StaticInst* si, int dst_idx,
-                            FloatReg val) override;
+    RegVal readFloatRegOperandBits(const StaticInst* si, int op_idx) override;
     void setFloatRegOperandBits(const StaticInst* si, int dst_idx,
-                                FloatRegBits val) override;
+                                RegVal val) override;
 
 
     const VecRegContainer&
@@ -527,12 +518,12 @@ class InflightInst : public ExecContext,
     void setCCRegOperand(const StaticInst* si, int dst_idx, CCReg val)
                          override;
 
-    MiscReg readMiscRegOperand(const StaticInst* si, int op_idx) override;
+    RegVal readMiscRegOperand(const StaticInst* si, int op_idx) override;
     void setMiscRegOperand(const StaticInst* si, int dst_idx,
-                           const MiscReg& val) override;
+                           const RegVal& val) override;
 
-    MiscReg readMiscReg(int misc_reg) override;
-    void setMiscReg(int misc_reg, const MiscReg& val) override;
+    RegVal readMiscReg(int misc_reg) override;
+    void setMiscReg(int misc_reg, const RegVal& val) override;
 
     PCState pcState() const override;
     void pcState(const PCState& val) override;
@@ -565,7 +556,7 @@ class InflightInst : public ExecContext,
     /**
      * ARM-specific
      */
-    bool readPredicate() override;
+    bool readPredicate() const override;
     void setPredicate(bool val) override;
 
     /**
@@ -581,9 +572,9 @@ class InflightInst : public ExecContext,
      * MIPS-Specific
      */
 #if THE_ISA == MIPS_ISA
-    MiscReg readRegOtherThread(const RegId& reg,
+    RegVal readRegOtherThread(const RegId& reg,
                                ThreadID tid = InvalidThreadID) override;
-    void setRegOtherThread(const RegId& reg, MiscReg val,
+    void setRegOtherThread(const RegId& reg, RegVal val,
                            ThreadID tid = InvalidThreadID) override;
 #endif
 
