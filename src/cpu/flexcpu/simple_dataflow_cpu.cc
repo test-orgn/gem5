@@ -805,7 +805,7 @@ SimpleDataflowCPU::DataPort::recvTimingResp(PacketPtr pkt)
     panic_if(!cpu->outstandingMemReqs.count(pkt),
         "Received a data port response we don't remember sending!");
 
-    auto callback = cpu->outstandingMemReqs[pkt];
+    auto& callback = cpu->outstandingMemReqs[pkt];
 
     callback();
 
@@ -946,7 +946,7 @@ SimpleDataflowCPU::Resource::attemptAllRequests()
     while (!requests.empty() && resourceAvailable()) {
         DPRINTF(SDCPUCoreEvent, "Running request. %d left in queue. "
                 "%d this cycle\n", requests.size(), usedBandwidth);
-        auto req = requests.front();
+        auto& req = requests.front();
         DPRINTF(SDCPUCoreEvent, "Executing request directly\n");
         if (req()) usedBandwidth++;
 
