@@ -107,6 +107,16 @@ SimpleDataflowCPU::completeMemAccess(PacketPtr orig_pkt, StaticInstPtr inst,
             panic("Malformed split MemAccessReq received!");
         }
 
+        // If the other half of the request was killed somehow, we need to
+        // clean up to avoid memory leaks. Only one of the conditions here will
+        // be true, because the other one will match orig_pkt, and be deleted
+        // via the recvTimingResp() function.
+        if (!split->low || !split->high) {
+            delete split->main;
+            delete split;
+            return;
+        }
+
         if (!(split->lowReceived && split->highReceived))
             return; // We need to wait for the other to complete as well
 
@@ -520,7 +530,7 @@ SimpleDataflowCPU::requestSplitMemRead(const RequestPtr& main,
             // No need to send req if squashed
             delete split_acc->low;
             split_acc->low = nullptr;
-            if (!split_acc->high) {
+            if (!split_acc->high || split_acc->highReceived) {
                 delete split_acc->main;
                 delete split_acc;
             }
@@ -557,7 +567,7 @@ SimpleDataflowCPU::requestSplitMemRead(const RequestPtr& main,
             // No need to send req if squashed
             delete split_acc->high;
             split_acc->high = nullptr;
-            if (!split_acc->low) {
+            if (!split_acc->low || split_acc->lowReceived) {
                 delete split_acc->main;
                 delete split_acc;
             }
@@ -639,7 +649,7 @@ SimpleDataflowCPU::requestSplitMemWrite(const RequestPtr& main,
             // No need to send req if squashed
             delete split_acc->low;
             split_acc->low = nullptr;
-            if (!split_acc->high) {
+            if (!split_acc->high || split_acc->highReceived) {
                 delete split_acc->main;
                 delete split_acc;
             }
@@ -680,7 +690,7 @@ SimpleDataflowCPU::requestSplitMemWrite(const RequestPtr& main,
             // No need to send req if squashed
             delete split_acc->high;
             split_acc->high = nullptr;
-            if (!split_acc->low) {
+            if (!split_acc->low || split_acc->lowReceived) {
                 delete split_acc->main;
                 delete split_acc;
             }
