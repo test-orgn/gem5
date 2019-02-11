@@ -65,14 +65,14 @@ InflightInst::addCommitCallback(function<void()> callback)
 }
 
 void
-InflightInst::addCommitDependency(shared_ptr<InflightInst> parent)
+InflightInst::addCommitDependency(InflightInst& parent)
 {
-    if (parent->isSquashed() || parent->isCommitted()) return;
+    if (parent.isSquashed() || parent.isCommitted()) return;
 
     ++remainingDependencies;
 
     weak_ptr<InflightInst> weak_this = shared_from_this();
-    parent->addCommitCallback([weak_this]() {
+    parent.addCommitCallback([weak_this]() {
         shared_ptr<InflightInst> inst_ptr = weak_this.lock();
         if (!inst_ptr) return;
 
@@ -91,13 +91,13 @@ InflightInst::addCompletionCallback(function<void()> callback)
 }
 
 void
-InflightInst::addDependency(shared_ptr<InflightInst> parent)
+InflightInst::addDependency(InflightInst& parent)
 {
-    if (parent->isSquashed() || parent->isComplete()) return;
+    if (parent.isSquashed() || parent.isComplete()) return;
     ++remainingDependencies;
 
     weak_ptr<InflightInst> weak_this = shared_from_this();
-    parent->addCompletionCallback([weak_this]() {
+    parent.addCompletionCallback([weak_this]() {
         shared_ptr<InflightInst> inst_ptr = weak_this.lock();
         if (!inst_ptr) return;
 
@@ -122,14 +122,14 @@ InflightInst::addMemReadyCallback(function<void()> callback)
 }
 
 void
-InflightInst::addMemCommitDependency(shared_ptr<InflightInst> parent)
+InflightInst::addMemCommitDependency(InflightInst& parent)
 {
-    if (parent->isSquashed() || parent->isCommitted()) return;
+    if (parent.isSquashed() || parent.isCommitted()) return;
 
     ++remainingMemDependencies;
 
     weak_ptr<InflightInst> weak_this = shared_from_this();
-    parent->addCommitCallback([weak_this]() {
+    parent.addCommitCallback([weak_this]() {
         shared_ptr<InflightInst> inst_ptr = weak_this.lock();
         if (!inst_ptr) return;
 
@@ -142,14 +142,14 @@ InflightInst::addMemCommitDependency(shared_ptr<InflightInst> parent)
 }
 
 void
-InflightInst::addMemDependency(shared_ptr<InflightInst> parent)
+InflightInst::addMemDependency(InflightInst& parent)
 {
-    if (parent->isSquashed() || parent->isComplete()) return;
+    if (parent.isSquashed() || parent.isComplete()) return;
 
     ++remainingMemDependencies;
 
     weak_ptr<InflightInst> weak_this = shared_from_this();
-    parent->addCompletionCallback([weak_this]() {
+    parent.addCompletionCallback([weak_this]() {
         shared_ptr<InflightInst> inst_ptr = weak_this.lock();
         if (!inst_ptr) return;
 
@@ -162,14 +162,14 @@ InflightInst::addMemDependency(shared_ptr<InflightInst> parent)
 }
 
 void
-InflightInst::addMemEffAddrDependency(shared_ptr<InflightInst> parent)
+InflightInst::addMemEffAddrDependency(InflightInst& parent)
 {
-    if (parent->isSquashed() || parent->isEffAddred()) return;
+    if (parent.isSquashed() || parent.isEffAddred()) return;
 
     ++remainingMemDependencies;
 
     weak_ptr<InflightInst> weak_this = shared_from_this();
-    parent->addEffAddrCalculatedCallback([weak_this]() {
+    parent.addEffAddrCalculatedCallback([weak_this]() {
         shared_ptr<InflightInst> inst_ptr = weak_this.lock();
         if (!inst_ptr) return;
 

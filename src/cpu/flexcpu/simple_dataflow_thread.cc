@@ -856,7 +856,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
         if (serializing_inst) {
             DPRINTF(SDCPUDeps, "Dep %d -> %d [serial]\n",
                     inst_ptr->seqNum(), serializing_inst->seqNum());
-            inst_ptr->addCommitDependency(serializing_inst);
+            inst_ptr->addCommitDependency(*serializing_inst);
             waitingForSerializing++;
         }
 
@@ -869,7 +869,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
             if (!(last_inst->isCommitted() || last_inst->isSquashed())) {
                 DPRINTF(SDCPUDeps, "Dep %d -> %d [serial]\n",
                         inst_ptr->seqNum(), last_inst->seqNum());
-                inst_ptr->addCommitDependency(last_inst);
+                inst_ptr->addCommitDependency(*last_inst);
                 serializingInst++;
             }
 
@@ -882,7 +882,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
 
             DPRINTF(SDCPUDeps, "Dep %d -> %d [serial]\n",
                     inst_ptr->seqNum(), last_inst->seqNum());
-            inst_ptr->addCommitDependency(last_inst);
+            inst_ptr->addCommitDependency(*last_inst);
             serializingInst++;
         }
 
@@ -890,7 +890,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
         if (serializing_inst) {
             DPRINTF(SDCPUDeps, "Dep %d -> %d [serial]\n",
                     inst_ptr->seqNum(), serializing_inst->seqNum());
-            inst_ptr->addCommitDependency(serializing_inst);
+            inst_ptr->addCommitDependency(*serializing_inst);
             waitingForSerializing++;
         }
 
@@ -912,7 +912,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
         if (last_barrier) {
             DPRINTF(SDCPUDeps, "Dep %d -> %d [mem ref -> barrier]\n",
                     inst_ptr->seqNum(), last_barrier->seqNum());
-            inst_ptr->addMemDependency(last_barrier);
+            inst_ptr->addMemDependency(*last_barrier);
             waitingForMemBarrier++;
         }
     }
@@ -933,10 +933,10 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
                                    "\n",
                         inst_ptr->seqNum(), (*itr)->seqNum());
                 if (static_inst->isMemRef()) {
-                    inst_ptr->addMemDependency(*itr);
+                    inst_ptr->addMemDependency(**itr);
                     waitingForMemBarrier++;
                 } else {
-                    inst_ptr->addDependency(*itr);
+                    inst_ptr->addDependency(**itr);
                     waitingForMemBarrier++;
                 }
             }
@@ -955,7 +955,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
         const shared_ptr<InflightInst> last_inst = *(++inflightInsts.rbegin());
 
         if (!(last_inst->isCommitted() || last_inst->isSquashed())) {
-            inst_ptr->addCommitDependency(last_inst);
+            inst_ptr->addCommitDependency(*last_inst);
             nonSpeculativeInst++;
         }
 
@@ -1019,7 +1019,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
                         if (inst_ptr->effAddrOverlap(*other)) {
                             DPRINTF(SDCPUDeps, "Dep %d -> %d [mem]\n",
                                     inst_ptr->seqNum(), other->seqNum());
-                            inst_ptr->addMemDependency(other);
+                            inst_ptr->addMemDependency(*other);
                         }
                     }
                 );
@@ -1049,7 +1049,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
                         if (inst_ptr->effAddrOverlap(*other)) {
                             DPRINTF(SDCPUDeps, "Dep %d -> %d [mem]\n",
                                     inst_ptr->seqNum(), other->seqNum());
-                            inst_ptr->addMemDependency(other);
+                            inst_ptr->addMemDependency(*other);
                         }
                     }
                 );
@@ -1071,7 +1071,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
                         if (inst_ptr->effAddrOverlap(*other)) {
                             DPRINTF(SDCPUDeps, "Dep %d -> %d [mem]\n",
                                     inst_ptr->seqNum(), other->seqNum());
-                            inst_ptr->addMemDependency(other);
+                            inst_ptr->addMemDependency(*other);
                         }
                     }
                 );
@@ -1083,7 +1083,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
                 //       all appropriate memory dependencies.
                 DPRINTF(SDCPUDeps, "Dep %d -> %d [mem predicted overlap]\n",
                         inst_ptr->seqNum(), other->seqNum());
-                inst_ptr->addMemEffAddrDependency(other);
+                inst_ptr->addMemEffAddrDependency(*other);
             }
         }
     }
@@ -1096,7 +1096,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
         const shared_ptr<InflightInst> last_inst = *(++inflightInsts.rbegin());
         DPRINTF(SDCPUDeps, "Dep %d -> %d [st @ commit]\n",
                 inst_ptr->seqNum(), last_inst->seqNum());
-        inst_ptr->addMemCommitDependency(last_inst);
+        inst_ptr->addMemCommitDependency(*last_inst);
     }
 
     // END Only store if instruction is at head of inflightInsts
@@ -1117,7 +1117,7 @@ SDCPUThread::populateDependencies(shared_ptr<InflightInst> inst_ptr)
                     inst_ptr->seqNum(), producer->seqNum(),
                     src_reg.className(),
                     src_reg.index());
-            inst_ptr->addDependency(producer);
+            inst_ptr->addDependency(*producer);
         }
 
         inst_ptr->setDataSource(src_idx, last_use);
