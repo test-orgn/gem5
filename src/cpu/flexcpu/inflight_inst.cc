@@ -34,7 +34,6 @@ using namespace std;
 
 using PCState = TheISA::PCState;
 
-using CCReg = TheISA::CCReg;
 using VecElem = TheISA::VecElem;
 
 InflightInst::InflightInst(ThreadContext* backing_context,
@@ -207,8 +206,8 @@ InflightInst::commitToTC()
             backingContext->setIntReg(dst_reg.index(), result.asIntReg());
             break;
           case FloatRegClass:
-            backingContext->setFloatRegBits(dst_reg.index(),
-                                            result.asFloatRegBits());
+            backingContext->setFloatReg(dst_reg.index(),
+                                        result.asFloatRegBits());
             break;
           case VecRegClass:
             backingContext->setVecReg(dst_reg, result.asVecReg());
@@ -438,7 +437,7 @@ InflightInst::readFloatRegOperandBits(const StaticInst* si, int op_idx)
         // Either the producing instruction has already been committed, or no
         // dependency was in-flight at the time that this instruction was
         // issued.
-        return backingContext->readFloatRegBits(reg_id.index());
+        return backingContext->readFloatReg(reg_id.index());
     }
 }
 
@@ -606,7 +605,31 @@ InflightInst::setVecElemOperand(const StaticInst* si, int dst_idx,
     // TODO
 }
 
-CCReg
+const TheISA::VecPredRegContainer&
+InflightInst::readVecPredRegOperand(const StaticInst *si, int idx) const
+{
+    panic("readVecPredRegOperand() not implemented!");
+    return *(VecPredRegContainer*)nullptr;
+    // TODO
+}
+
+TheISA::VecPredRegContainer&
+InflightInst::getWritableVecPredRegOperand(const StaticInst *si, int idx)
+{
+    panic("getWritableVecPredRegOperand() not implemented!");
+    return *(VecPredRegContainer*)nullptr;
+    // TODO
+}
+
+void
+InflightInst::setVecPredRegOperand(const StaticInst *si, int idx,
+                                   const TheISA::VecPredRegContainer& val)
+{
+    panic("setVecPredRegOperand() not implemented!");
+    // TODO
+}
+
+RegVal
 InflightInst::readCCRegOperand(const StaticInst* si, int op_idx)
 {
     const RegId& reg_id = si->srcRegIdx(op_idx);
@@ -632,7 +655,7 @@ InflightInst::readCCRegOperand(const StaticInst* si, int op_idx)
 }
 
 void
-InflightInst::setCCRegOperand(const StaticInst* si, int dst_idx, CCReg val)
+InflightInst::setCCRegOperand(const StaticInst* si, int dst_idx, RegVal val)
 {
     assert(si->destRegIdx(dst_idx).isCCReg());
 
@@ -666,8 +689,7 @@ InflightInst::readMiscRegOperand(const StaticInst* si, int op_idx)
 }
 
 void
-InflightInst::setMiscRegOperand(const StaticInst* si, int dst_idx,
-                                const RegVal& val)
+InflightInst::setMiscRegOperand(const StaticInst* si, int dst_idx, RegVal val)
 {
     assert(si->destRegIdx(dst_idx).isMiscReg());
 
@@ -682,7 +704,7 @@ InflightInst::readMiscReg(int misc_reg)
 }
 
 void
-InflightInst::setMiscReg(int misc_reg, const RegVal& val)
+InflightInst::setMiscReg(int misc_reg, RegVal val)
 {
     // O3 hides multiple writes to the same misc reg during execution, but due
     // to potential side effects of each access, I don't think we should be
