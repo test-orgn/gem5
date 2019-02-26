@@ -675,6 +675,10 @@ class SDCPUThread : public ThreadContext
     CheckerCPU *getCheckerCpuPtr() override
     { return _committedState->getCheckerCpuPtr(); }
 
+
+    TheISA::ISA *getIsaPtr()
+    { return _committedState->getIsaPtr(); }
+
     TheISA::Decoder *getDecoderPtr() override
     { return &decoder; }
 
