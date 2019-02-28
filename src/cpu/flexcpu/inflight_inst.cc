@@ -61,7 +61,7 @@ InflightInst::~InflightInst()
 void
 InflightInst::addCommitCallback(function<void()> callback)
 {
-    commitCallbacks.push_back(callback);
+    commitCallbacks.push_back(move(callback));
 }
 
 void
@@ -87,7 +87,7 @@ InflightInst::addCommitDependency(shared_ptr<InflightInst> parent)
 void
 InflightInst::addCompletionCallback(function<void()> callback)
 {
-    completionCallbacks.push_back(callback);
+    completionCallbacks.push_back(move(callback));
 }
 
 void
@@ -112,13 +112,13 @@ InflightInst::addDependency(shared_ptr<InflightInst> parent)
 void
 InflightInst::addEffAddrCalculatedCallback(function<void()> callback)
 {
-    effAddrCalculatedCallbacks.push_back(callback);
+    effAddrCalculatedCallbacks.push_back(move(callback));
 }
 
 void
 InflightInst::addMemReadyCallback(function<void()> callback)
 {
-    memReadyCallbacks.push_back(callback);
+    memReadyCallbacks.push_back(move(callback));
 }
 
 void
@@ -184,13 +184,13 @@ InflightInst::addMemEffAddrDependency(shared_ptr<InflightInst> parent)
 void
 InflightInst::addReadyCallback(function<void()> callback)
 {
-    readyCallbacks.push_back(callback);
+    readyCallbacks.push_back(move(callback));
 }
 
 void
 InflightInst::addSquashCallback(function<void()> callback)
 {
-    squashCallbacks.push_back(callback);
+    squashCallbacks.push_back(move(callback));
 }
 
 void
