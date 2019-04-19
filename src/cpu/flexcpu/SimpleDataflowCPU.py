@@ -28,12 +28,22 @@
 
 
 from BaseCPU import BaseCPU
+from BranchPredictor import *
 from m5.params import *
 from m5.proxy import *
 
 class SimpleDataflowCPU(BaseCPU):
     type = 'SimpleDataflowCPU'
     cxx_header = 'cpu/flexcpu/simple_dataflow_cpu.hh'
+
+    # formatted camelCase to use same parameter name as other CPU models.
+    branchPred = Param.BranchPredictor(TournamentBP(
+        numThreads = Parent.numThreads), "Branch predictor")
+    branch_pred_max_depth = Param.Unsigned(20,
+                                           "How many branches deep the "
+                                           "predictor is allowed to explore "
+                                           "at any given point in time. Set "
+                                           "to 0 for infinite.")
 
     clocked_cpu = Param.Bool(False, "Ties stages of the cpu to clock edges")
 
