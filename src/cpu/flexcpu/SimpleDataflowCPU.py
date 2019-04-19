@@ -51,6 +51,14 @@ class SimpleDataflowCPU(BaseCPU):
                                         "sending packets to memory to clock "
                                         "edges")
 
+    clocked_execution = Param.Bool(Self.clocked_cpu, "Ties requests for "
+                                   "instruction execution to clock edges.")
+    execution_latency = Param.Cycles(1, "Number of cycles for each "
+                                         "instruction to execute")
+    execution_bandwidth = Param.Cycles(0, "Number of executions each cycle. "
+                                          "Assumes a fully-pipelined unit and "
+                                          "0 implies infinite bandwidth.")
+
     fetch_buffer_size = Param.Unsigned(Parent.cache_line_size,
                                        "Size of fetch buffer in bytes. "
                                        "Also determines size of fetch "
@@ -59,14 +67,6 @@ class SimpleDataflowCPU(BaseCPU):
 
     strict_serialization = Param.Bool(True, "Controls behavior of serializing "
                                             "flags on instructions.")
-
-    clocked_execution = Param.Bool(Self.clocked_cpu, "Ties requests for "
-                                   "instruction execution to clock edges.")
-    execution_latency = Param.Cycles(1, "Number of cycles for each "
-                                         "instruction to execute")
-    execution_bandwidth = Param.Cycles(0, "Number of executions each cycle. "
-                                          "Assumes a fully-pipelined unit and "
-                                          "0 implies infinite bandwidth.")
 
     @classmethod
     def memory_mode(cls):

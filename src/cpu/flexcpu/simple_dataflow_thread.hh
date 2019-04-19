@@ -213,8 +213,11 @@ class SDCPUThread : public ThreadContext
      * related events, such as attemptFetch to kick off any upcoming tasks
      * necessary to complete that instruction. May issue an instruction
      * immediately if no new information is needed to set up a new instruction.
+     *
+     * @param nextPC The PC the system should be at for fetching and executing
+     *  the upcoming instruction.
      */
-    void advanceInst();
+    void advanceInst(TheISA::PCState next_pc);
 
     /**
      * Entry point to fetch functionality. May be called more than once for a
@@ -279,6 +282,15 @@ class SDCPUThread : public ThreadContext
      * instruction, instead of committing the value to the _committedState.
      */
     void handleFault(std::shared_ptr<InflightInst> inst_ptr);
+
+    /**
+     * This function checks if the thread should be active at this moment, and
+     * whether or not we have a reasonable PC value ready to be able to
+     * initiate another fetch at this time.
+     *
+     * @return Whether we can start a new fetch at this point in time.
+     */
+    bool hasNextPC();
 
     /**
      * This function has the job of populating an instruction's fields with
@@ -400,27 +412,39 @@ class SDCPUThread : public ThreadContext
      * currently active InflightInsts. The dependencies should be added to this
      * instruction via its addDependency() interface function.
      *
-     * @param inst The instruction for which we want to detect dependencies.
+     * @param inst_ptr The instruction for which we want to detect
+     * dependencies.
      */
-    void populateDependencies(std::shared_ptr<InflightInst> inst);
+    void populateDependencies(std::shared_ptr<InflightInst> inst_ptr);
 
     /**
      * This function iterates through the registers that this instruction
      * writes and associates the registers with the corresponding instructions
      * in order to streamline dependency tracking. Like a scoreboard.
      *
-     * @param inst The instruction for which we want to track uses.
+     * @param inst_ptr The instruction for which we want to track uses.
      */
-    void populateUses(std::shared_ptr<InflightInst> inst);
+    void populateUses(std::shared_ptr<InflightInst> inst_ptr);
 
     /**
-     * This function checks if the thread should be active at this moment, and
-     * whether or not we have a reasonable PC value ready to be able to
-     * initiate another fetch at this time.
+     * This function iterates through the inflightInsts buffer and squashes
+     * every instruction older than inst_ptr. This will both notify the
+     * instructions that they have been squashed and remove them from the
+     * buffer.
      *
-     * @return Whether we can start a new fetch at this point in time.
+     * If inst_ptr is not in the buffer, then this will clear the entire
+     * buffer.
+     *
+     * This function may also has the side effect of rebuilding the lastUses
+     * map, since squashing instructions may invalidate entries in the map.
+     *
+     * @param inst_ptr The instruction before the oldest instruction that
+     *  should be squashed and removed.
+     * @param rebuild_map Whether the squash event should result in the
+     *  rebuilding of the register usage map.
      */
-    bool hasNextPC();
+    void squashUpTo(std::shared_ptr<InflightInst> inst_ptr,
+                    bool rebuild_map = false);
 
     // END Internal functions
 
