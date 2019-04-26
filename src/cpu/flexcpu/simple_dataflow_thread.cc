@@ -369,8 +369,8 @@ SDCPUThread::commitInstruction(std::shared_ptr<InflightInst> inst_ptr)
 
     Trace::InstRecord* const trace_data = inst_ptr->traceData();
     if (trace_data) {
-        trace_data->setFetchSeq(lastCommittedInstNum);
-        trace_data->setCPSeq(lastCommittedInstNum);
+        trace_data->setFetchSeq(inst_ptr->issueSeqNum());
+        trace_data->setCPSeq(inst_ptr->seqNum());
         trace_data->dump();
     }
 }
@@ -725,6 +725,7 @@ SDCPUThread::onIssueAccessed(weak_ptr<InflightInst> inst)
     inst_ptr->traceData(nullptr);
 #endif
 
+    inst_ptr->issueSeqNum(nextIssueNum++);
     populateDependencies(inst_ptr);
     populateUses(inst_ptr);
 

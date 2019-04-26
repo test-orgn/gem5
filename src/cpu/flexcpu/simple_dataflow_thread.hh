@@ -141,6 +141,11 @@ class SDCPUThread : public ThreadContext
      */
     InstSeqNum lastCommittedInstNum = 0;
 
+    /**
+     * The next instruction sequence number for tracking all fetched insts.
+     */
+    InstSeqNum nextIssueNum = 0;
+
     // END Solid architectural state
 
 
