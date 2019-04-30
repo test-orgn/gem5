@@ -234,7 +234,7 @@ InflightInst::commitToTC()
         backingISA->setMiscReg(
             miscResultIdxs[i], miscResultVals[i], backingContext);
 
-    backingContext->getCpuPtr()->probeInstCommit(instRef);
+    backingContext->getCpuPtr()->probeInstCommit(instRef, pc.instAddr());
 }
 
 bool
