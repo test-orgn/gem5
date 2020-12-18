@@ -1,5 +1,5 @@
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, List
 
 from .util import StorageType
 from .jsonserializable import JsonSerializable
@@ -36,10 +36,22 @@ class Statistic(JsonSerializable):
     def load(cls, data: Dict[str, Any]) -> "Statistic":
         return cls(data)
 
-    def to_json_dict(self) ->Dict:
-        raise NotImplementedError
+class Distribution(Statistic):
+    value: List[Union[float, int]]
+    bins: List[Union[float, int]]
 
+    def __init__(self, value: List[Union[float, int]],
+                 bins: List[Union[float, int]],
+                 unit: Optional[str] = None,
+                 description: Optional[str] = None):
+        super(Distribution, self).__init__(value, type, unit, description)
 
+        if self.type is not None:
+            assert(self.type == 'Distribution')
+        else:
+            self.type = 'Distribution'
+
+        self.bins = bins
 class Scalar(Statistic):
 
     value: Union[float, int]
@@ -70,11 +82,11 @@ class Scalar(Statistic):
     def load(cls, data: Dict[str, Any]) -> "Scalar":
         return cls(data)
 
-    def to_json_dict(self) ->Dict:
-        model_dct = {}
-        for key, value in self.__dict__.items():
-            if isinstance(value, JsonSerializable):
-                model_dct[key] = value.to_json_dict(value)
-            else:
-                model_dct[key] = value
-        return model_dct
+   # def to_json_dict(self) ->Dict:
+   #     model_dct = {}
+   #     for key, value in self.__dict__.items():
+   #         if isinstance(value, JsonSerializable):
+   #             model_dct[key] = value.to_json_dict(value)
+   #         else:
+   #             model_dct[key] = value
+   #     return model_dct

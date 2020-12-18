@@ -147,6 +147,15 @@ pybind_init_stats(py::module &m_native)
         .def("total", &Stats::ScalarInfo::total)
         ;
 
+    py::class_<Stats::DistInfo, Stats::Info,
+                std::unique_ptr<Stats::DistInfo, py::nodelete>>(
+                    m, "DistInfo")
+        .def("min", &Stats::DistInfo::min)
+        .def("max", &Stats::DistInfo::max)
+        .def("bucket_size", &Stats::DistInfo::bucket_size)
+        .def("values", &Stats::DistInfo::values)
+        ;
+
     py::class_<Stats::Group, std::unique_ptr<Stats::Group, py::nodelete>>(
         m, "Group")
         .def("regStats", &Stats::Group::regStats)

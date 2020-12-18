@@ -64,6 +64,22 @@ def _get_statistic(statistic):
         datatype = None # TODO
 
         return Scalar(value, stat_type, unit, description, datatype)
+    elif isinstance(statistic, _m5.stats.DistInfo):
+        stat_type = "Distribution"
+        unit = None # TODO
+        description = statistic.desc
+        value = statistic.value()
+        print("DIST INFO REACHED!")
+
+        # Figure out the bin size.
+        # I assume the each bin starts at the value specified(inclusive)
+        bins = []
+        bins.append(statistic.min())
+
+        while(bins[-1] + statistic.bucket_size() < statistic.max()):
+            bins.append(bins[-1] + statistic.bucket_size())
+
+        return Distribution(value, bins, unit, description)
     return None
 
 def _get_simstat(root: Root):
@@ -76,8 +92,9 @@ def _get_simstat(root: Root):
     simulated_end_time = int(final_tick)
 
     stats_map = {}
-    for key,value in root.getStatGroups().items():
-        stats_map[key] = _get_model(value)
+    stats_map['system'] = _get_model(root.system)
+    #for key,value in root.getStatGroups().items():
+    #    stats_map[key] = _get_model(value)
 
     return SimStat(creationTime=creation_time,
                    timeConversion=time_converstion,
